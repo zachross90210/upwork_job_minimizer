@@ -1,0 +1,16 @@
+# Pack / build output
+*.zip
+*.zip
+*.crx
+*.pem
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
