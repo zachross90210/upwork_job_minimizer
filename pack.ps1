@@ -1,6 +1,12 @@
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
-$zip = Join-Path $root "upwork-job-tile-minimizer.zip"
+$manifest = Get-Content (Join-Path $root "manifest.json") -Raw | ConvertFrom-Json
+$version = $manifest.version
+if (-not $version) {
+  throw "Version not found in manifest.json"
+}
+
+$zip = Join-Path $root ("upwork-job-tile-minimizer-{0}.zip" -f $version)
 $files = @(
   "manifest.json",
   "content.js",
