@@ -2,6 +2,7 @@ const LEGACY_KEY = "minimizedOpeningUids";
 const META_KEY = "ujm_n";
 const CHUNK_PREFIX = "ujm_c";
 const MAX_ITEM_BYTES = 7000;
+const TTL_MS = 24 * 60 * 60 * 1000;
 
 let minimized = {};
 let scanTimer = 0;
@@ -26,23 +27,27 @@ function jobTitle(section) {
   return link ? link.textContent.trim() : "Job";
 }
 
-function chunkBytes(uids) {
-  return JSON.stringify(uids).length;
+function isHidden(uid) {
+  return Number.isFinite(minimized[uid]);
 }
 
-function buildChunks(uids) {
+function chunkBytes(entries) {
+  return JSON.stringify(entries).length;
+}
+
+function buildChunks(entries) {
   const chunks = [];
   let current = [];
-  for (const uid of uids) {
-    const next = current.concat(uid);
+  for (const entry of entries) {
+    const next = current.concat([entry]);
     if (current.length && chunkBytes(next) > MAX_ITEM_BYTES) {
       chunks.push(current);
-      current = [uid];
+      current = [entry];
     } else {
       current = next;
     }
   }
-  chunks.push(current);
+  if (current.length) chunks.push(current);
   return chunks;
 }
 
@@ -54,31 +59,60 @@ function isUjmKey(key) {
   );
 }
 
+function normalizeTimestamp(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return Date.now();
+}
+
+function pruneExpired() {
+  const cutoff = Date.now() - TTL_MS;
+  let changed = false;
+  for (const uid of Object.keys(minimized)) {
+    if (minimized[uid] < cutoff) {
+      delete minimized[uid];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function parseStored(data) {
   const next = {};
+  let migrated = false;
+
   if (typeof data[META_KEY] === "number") {
     for (let i = 0; i < data[META_KEY]; i++) {
       const chunk = data[CHUNK_PREFIX + i];
       if (!Array.isArray(chunk)) continue;
-      for (const uid of chunk) {
-        if (uid) next[uid] = true;
+      for (const item of chunk) {
+        if (typeof item === "string" && item) {
+          next[item] = Date.now();
+          migrated = true;
+          continue;
+        }
+        if (Array.isArray(item) && item[0]) {
+          next[item[0]] = normalizeTimestamp(item[1]);
+        }
       }
     }
-    return next;
+    return { map: next, migrated };
   }
 
   const legacy = data[LEGACY_KEY];
   if (legacy && typeof legacy === "object" && !Array.isArray(legacy)) {
     for (const uid of Object.keys(legacy)) {
-      if (legacy[uid]) next[uid] = true;
+      if (!legacy[uid]) continue;
+      next[uid] = normalizeTimestamp(legacy[uid]);
+      migrated = true;
     }
   }
-  return next;
+  return { map: next, migrated };
 }
 
 function persist() {
-  const uids = Object.keys(minimized);
-  const chunks = uids.length ? buildChunks(uids) : [];
+  pruneExpired();
+  const entries = Object.keys(minimized).map((uid) => [uid, minimized[uid]]);
+  const chunks = entries.length ? buildChunks(entries) : [];
   const payload = { [META_KEY]: chunks.length };
   chunks.forEach((chunk, i) => {
     payload[CHUNK_PREFIX + i] = chunk;
@@ -122,10 +156,12 @@ function loadMinimized() {
       return;
     }
 
-    minimized = parseStored(data || {});
+    const parsed = parseStored(data || {});
+    minimized = parsed.map;
+    const pruned = pruneExpired();
     scan();
 
-    if (data && data[LEGACY_KEY] != null && typeof data[META_KEY] !== "number") {
+    if (pruned || parsed.migrated) {
       persist();
     }
   });
@@ -135,7 +171,7 @@ function applySection(section) {
   const uid = section.getAttribute("data-ev-opening_uid");
   if (!uid) return;
 
-  const hidden = minimized[uid] === true;
+  const hidden = isHidden(uid);
   section.classList.toggle("ujm-minimized", hidden);
 
   const button = section.querySelector(":scope > .ujm-bar .ujm-toggle");
@@ -170,8 +206,8 @@ function ensureBar(section) {
     event.stopPropagation();
     const uid = section.getAttribute("data-ev-opening_uid");
     if (!uid) return;
-    if (minimized[uid]) delete minimized[uid];
-    else minimized[uid] = true;
+    if (isHidden(uid)) delete minimized[uid];
+    else minimized[uid] = Date.now();
     applySection(section);
     persist();
   });
