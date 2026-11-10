@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Upwork Job Tile Minimizer",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Hide job tiles on Upwork Find Work and remember that state in sync storage.",
   "icons": {
     "16": "icon-16.png",
@@ -11,7 +11,10 @@
   "permissions": ["storage"],
   "content_scripts": [
     {
-      "matches": ["https://www.upwork.com/nx/find-work/*"],
+      "matches": [
+        "https://www.upwork.com/nx/find-work/*",
+        "https://www.upwork.com/nx/s/find-work/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"

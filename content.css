@@ -33,19 +33,23 @@
   text-decoration: none;
 }
 
-section.air3-card-section.ujm-minimized {
+section.air3-card-section.ujm-minimized,
+div.job-tile.ujm-minimized {
   padding-top: 8px !important;
   padding-bottom: 8px !important;
 }
 
-section.air3-card-section.ujm-minimized > .ujm-bar {
+section.air3-card-section.ujm-minimized > .ujm-bar,
+div.job-tile.ujm-minimized > .ujm-bar {
   margin-bottom: 0;
 }
 
-section.air3-card-section.ujm-minimized > :not(.ujm-bar) {
+section.air3-card-section.ujm-minimized > :not(.ujm-bar),
+div.job-tile.ujm-minimized > :not(.ujm-bar) {
   display: none !important;
 }
 
-section.air3-card-section.ujm-minimized .ujm-title {
+section.air3-card-section.ujm-minimized .ujm-title,
+div.job-tile.ujm-minimized .ujm-title {
   display: block;
 }

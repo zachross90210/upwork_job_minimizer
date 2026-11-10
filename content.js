@@ -9,21 +9,43 @@ let scanTimer = 0;
 let loadTimer = 0;
 
 function isFeedPage() {
-  return location.pathname.startsWith("/nx/find-work/my-feed");
-}
-
-function jobSections() {
-  return document.querySelectorAll(
-    "section.air3-card-section[data-ev-opening_uid]"
+  const path = location.pathname;
+  return (
+    path.startsWith("/nx/find-work/") || path.startsWith("/nx/s/find-work/")
   );
 }
 
-function jobLink(section) {
-  return section.querySelector("h3.job-tile-title a");
+function jobTiles() {
+  const seen = new Set();
+  const tiles = [];
+  const nodes = document.querySelectorAll(
+    "section.air3-card-section[data-ev-opening_uid], div.job-tile[data-test='job-tile']"
+  );
+  nodes.forEach((node) => {
+    if (seen.has(node)) return;
+    seen.add(node);
+    tiles.push(node);
+  });
+  return tiles;
 }
 
-function jobTitle(section) {
-  const link = jobLink(section);
+function jobUid(tile) {
+  const own = tile.getAttribute("data-ev-opening_uid");
+  if (own) return own;
+  const nested = tile.querySelector("[data-ev-opening_uid]");
+  return nested ? nested.getAttribute("data-ev-opening_uid") : "";
+}
+
+function jobLink(tile) {
+  return (
+    tile.querySelector("h3.job-tile-title a") ||
+    tile.querySelector('h3[data-test="job-title"] a') ||
+    tile.querySelector("a.job-title-link")
+  );
+}
+
+function jobTitle(tile) {
+  const link = jobLink(tile);
   return link ? link.textContent.trim() : "Job";
 }
 
@@ -167,14 +189,14 @@ function loadMinimized() {
   });
 }
 
-function applySection(section) {
-  const uid = section.getAttribute("data-ev-opening_uid");
+function applyTile(tile) {
+  const uid = jobUid(tile);
   if (!uid) return;
 
   const hidden = isHidden(uid);
-  section.classList.toggle("ujm-minimized", hidden);
+  tile.classList.toggle("ujm-minimized", hidden);
 
-  const button = section.querySelector(":scope > .ujm-bar .ujm-toggle");
+  const button = tile.querySelector(":scope > .ujm-bar .ujm-toggle");
   if (button) {
     const label = hidden ? "Show job" : "Hide job";
     button.textContent = hidden ? "Show" : "Hide";
@@ -182,18 +204,18 @@ function applySection(section) {
     button.setAttribute("aria-label", label);
   }
 
-  const title = section.querySelector(":scope > .ujm-bar .ujm-title");
-  const link = jobLink(section);
+  const title = tile.querySelector(":scope > .ujm-bar .ujm-title");
+  const link = jobLink(tile);
   if (title && link) {
-    const text = jobTitle(section);
+    const text = jobTitle(tile);
     if (title.textContent !== text) title.textContent = text;
     const href = link.getAttribute("href") || "";
     if (title.getAttribute("href") !== href) title.setAttribute("href", href);
   }
 }
 
-function ensureBar(section) {
-  if (section.querySelector(":scope > .ujm-bar")) return;
+function ensureBar(tile) {
+  if (tile.querySelector(":scope > .ujm-bar")) return;
 
   const bar = document.createElement("div");
   bar.className = "ujm-bar";
@@ -204,11 +226,11 @@ function ensureBar(section) {
   button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const uid = section.getAttribute("data-ev-opening_uid");
+    const uid = jobUid(tile);
     if (!uid) return;
     if (isHidden(uid)) delete minimized[uid];
     else minimized[uid] = Date.now();
-    applySection(section);
+    applyTile(tile);
     persist();
   });
 
@@ -216,14 +238,14 @@ function ensureBar(section) {
   title.className = "ujm-title";
 
   bar.append(button, title);
-  section.prepend(bar);
+  tile.prepend(bar);
 }
 
 function scan() {
   if (!isFeedPage()) return;
-  jobSections().forEach((section) => {
-    ensureBar(section);
-    applySection(section);
+  jobTiles().forEach((tile) => {
+    ensureBar(tile);
+    applyTile(tile);
   });
 }
 
